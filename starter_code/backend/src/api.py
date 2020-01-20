@@ -28,7 +28,6 @@ def get_drinks():
         'drinks': drinks
     })
     
-
 @app.route('/drinks-detail', methods=['GET'])
 @requires_auth('get:drinks-detail')
 def get_drinks_detail(payload):
@@ -43,8 +42,6 @@ def get_drinks_detail(payload):
         'success':True,
         'drinks': drinks
     })
-
-
 
 @app.route('/drinks', methods=['POST'])
 @requires_auth('post:drinks')
@@ -99,9 +96,6 @@ def delete_drinks(payload, id):
         })
     except:
         abort(422)
-
-
-
 
 ## Error Handling
 '''

@@ -8,7 +8,8 @@ app = Flask(__name__)
 
 AUTH0_DOMAIN = 'coffeeshop01.auth0.com'
 ALGORITHMS = ['RS256']
-API_AUDIENCE = 'coffee'
+API_AUDIENCE = 'coffee'#Admin@123
+
 
 
 class AuthError(Exception):
@@ -42,21 +43,30 @@ def get_token_auth_header():
     token = parts[1]
     return token
   
-
 def check_permissions(permission, payload):
-    raise Exception('Not Implemented')
+    if 'permissions' not in payload:
+                        raise AuthError({
+                            'code': 'invalid_claims',
+                            'description': 'Permissions not included in JWT.'
+                        }, 400)
 
+    if permission not in payload['permissions']:
+        raise AuthError({
+            'code': 'unauthorized',
+            'description': 'Permission not found.'
+        }, 403)
+    return True
 
 def verify_decode_jwt(token):
-    jsonurl = urlopen(f'https://{AUTH0_DOMAIN}/.well-known/jwks.json')
+    jsonurl = urlopen('https://'+AUTH0_DOMAIN+'/.well-known/jwks.json')
     jwks = json.loads(jsonurl.read())
-    unverified_header = jwt.get_unverified_header(token)
-    rsa_key = {}
+    unverified_header = jwt.get_unverified_header(token)  
     if 'kid' not in unverified_header:
         raise AuthError({
             'code': 'invalid_header',
             'description': 'Authorization malformed'
         }, 401)
+    rsa_key = {}
     for key in jwks['keys']:
         if key['kid'] == unverified_header['kid']:
             rsa_key = {
@@ -106,14 +116,12 @@ def requires_auth(permission=''):
             try:
                 payload = verify_decode_jwt(token)
             except:
-                check_permissions(permission, payload)
-                return f(payload, *args, **kwargs)
-
+                raise AuthError({
+                    'code': 'unauthorized',
+                    'description': 'Permissions not found'
+                }, 401)
+            check_permissions(permission, payload)
+            return f(payload, *args, **kwargs)
         return wrapper
     return requires_auth_decorator
-
-@app.route('/headers')
-@requires_auth
-def headers(payload):
-    print(payload)
-    return 'Access Granted'
+    
