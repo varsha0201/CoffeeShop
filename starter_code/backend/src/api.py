@@ -5,97 +5,101 @@ import json
 from flask_cors import CORS
 
 from .database.models import db_drop_and_create_all, setup_db, Drink
-from src.auth.auth import AuthError, requires_auth
+from .auth.auth import AuthError, requires_auth
 
 app = Flask(__name__)
 setup_db(app)
 CORS(app)
-db_drop_and_create_all()
+# app = Flask(__name__)
+# cors = CORS(app, resources={r"/drinks/*": {"origins": "*"}})
+# CORS(app)
+# setup_db(app)
 
+#db_drop_and_create_all()
+
+# def options (self):
+#     return {'Allow' : 'PUT' }, 200, \
+#     { 'Access-Control-Allow-Origin': '*', \
+#       'Access-Control-Allow-Methods' : 'PUT,GET' }
+
+    
 ## ROUTES
-
-@app.route('/drinks', methods=['GET'])
+@app.route('/drinks', methods=['GET','POST'])
 def get_drinks():
-    drink_info = Drink.query.orderby(Drink.id).all()
-
-    if len(drink_info)==0:
-        abort(404)
-
-    drinks = [drink.short() for drink in drink_info]
+    drinks = Drink.query.all()
+    formatted_drinks = [drink.short() for drink in drinks]
 
     return jsonify({
-        'success': True,
-        'drinks': drinks
-    })
+            'success': True,
+            'drinks': formatted_drinks
+            })
     
 @app.route('/drinks-detail', methods=['GET'])
 @requires_auth('get:drinks-detail')
 def get_drinks_detail(payload):
-    drink_info = Drink.query.orderby(Drink.id).all()
-
-    if len(drink_info)==0:
-        abort(404)
-    
-    drinks = [drink.long() for drink in drink_info]
-
+    drinks = Drink.query.all()
+    formatted_drinks = [drink.long() for drink in drinks]
+    print(formatted_drinks)
     return jsonify({
-        'success':True,
-        'drinks': drinks
-    })
+            'success': True,
+            'drinks': formatted_drinks
+            })
 
 @app.route('/drinks', methods=['POST'])
 @requires_auth('post:drinks')
 def post_drinks(payload):
-    body = request.get_json()
-    new_drink = Drink(title = body['title'], recipe = """{}""".format(body['recipe']))
-    new_drink.insert()
-    new_drink.recipe = body['recipe']
-    return jsonify({
-        'success': True,
-        'drinks': Drink.long(new_drink)
-    })
+        body = request.get_json(force=True)
+        title = body.get('title')
+        recipe = str(json.dumps(body.get('recipe')))
+        new_drink = Drink(title=title, recipe=recipe)
+        new_drink.insert()
+        drinks = []
+        drinks.append(new_drink.long())
+        return jsonify({
+                'success': True,
+                'drinks': drinks
+                })
 
-@app.route('/drink/<int:id>', methods=['PATCH'])
+@app.route('/drinks/<int:id>', methods=['PATCH'])
 @requires_auth('patch:drinks')
 def update_drink(payload, id):
-    body = request.get_json()
-    if not body:
-        abort(400)
-    
-    drink_update = Drink.query.filter(Drink.id == id).one_or_none()
+    drink = Drink.query.get(id)
+    print(drink)
+    if drink is None:
+            abort(404)
+    else:
+            body = request.get_json()
+            title = body.get('title', None)
+            recipe = json.loads(json.dumps(body.get('recipe', None)))
 
-    update_title = body.get('title', None)
-    update_recipe = body.get('recipe', None)
+            if title is not None and title != '':
+                    drink.title = title
+            if recipe is not None and recipe != '':
+                    drink.recipe = str(recipe)
+                    drink.update()
+                    drinks = []
+                    drinks.append(drink.long())
 
-    if update_title:
-        drink_update.title = body['title']
+            return jsonify({
+                    'success': True,
+                    'drinks': drinks
+                    })
 
-    if update_recipe:
-        drink_update.recipe = """"{}""".format(body['recipe'])
-
-    drink_update.update()
-
-    return jsonify({
-        'sucess': True,
-        'drinks': [Drink.long(drink_update)]
-    })
 
 @app.route('/drinks/<int:id>', methods=['DELETE'])
 @requires_auth('delete:drinks')
 def delete_drinks(payload, id):
-    drink_info = Drink.query.filter(Drink.id==id).one_or_none()
+    drink = Drink.query.get(id)
 
-    if Drink is None:
+    if drink is None:
         abort(404)
+    else:
+        drink.delete()
 
-    try:
-        drink_info.delete()
         return jsonify({
-            "success": True,
-            "delete":id
-        })
-    except:
-        abort(422)
+            'success': True,
+            'delete': id
+            })
 
 ## Error Handling
 '''
@@ -126,9 +130,9 @@ def bad_request(error):
         }), 400
 
 @app.errorhandler(AuthError)
-def auth_error(error):
+def handle_auth_error(error):
     return jsonify({
         "success": False,
         "error": error.status_code,
-        "message": error.error
+        "message": error.error.code
         }), error.status_code
