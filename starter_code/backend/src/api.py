@@ -10,82 +10,123 @@ from .auth.auth import AuthError, requires_auth
 app = Flask(__name__)
 setup_db(app)
 CORS(app)
-# app = Flask(__name__)
-# cors = CORS(app, resources={r"/drinks/*": {"origins": "*"}})
-# CORS(app)
-# setup_db(app)
+db_drop_and_create_all()
 
-#db_drop_and_create_all()
 
-# def options (self):
-#     return {'Allow' : 'PUT' }, 200, \
-#     { 'Access-Control-Allow-Origin': '*', \
-#       'Access-Control-Allow-Methods' : 'PUT,GET' }
-
-    
 ## ROUTES
-@app.route('/drinks', methods=['GET','POST'])
-def get_drinks():
-    drinks = Drink.query.all()
-    formatted_drinks = [drink.short() for drink in drinks]
-
-    return jsonify({
-            'success': True,
-            'drinks': formatted_drinks
-            })
-    
-@app.route('/drinks-detail', methods=['GET'])
-@requires_auth('get:drinks-detail')
-def get_drinks_detail(payload):
-    drinks = Drink.query.all()
-    formatted_drinks = [drink.long() for drink in drinks]
-    print(formatted_drinks)
-    return jsonify({
-            'success': True,
-            'drinks': formatted_drinks
-            })
-
-@app.route('/drinks', methods=['POST'])
-@requires_auth('post:drinks')
-def post_drinks(payload):
-        body = request.get_json(force=True)
-        title = body.get('title')
-        recipe = str(json.dumps(body.get('recipe')))
-        new_drink = Drink(title=title, recipe=recipe)
-        new_drink.insert()
-        drinks = []
-        drinks.append(new_drink.long())
-        return jsonify({
-                'success': True,
-                'drinks': drinks
-                })
-
-@app.route('/drinks/<int:id>', methods=['PATCH'])
-@requires_auth('patch:drinks')
-def update_drink(payload, id):
-    drink = Drink.query.get(id)
-    print(drink)
-    if drink is None:
-            abort(404)
+def get_all_drinks(recipe_format):
+    # Get all drinks in database
+    all_drinks = Drink.query.order_by(Drink.id).all()
+    # Format with different recipe detail level
+    if recipe_format.lower() == 'short':
+        all_drinks_formatted = [drink.short() for drink in all_drinks]
+    elif recipe_format.lower() == 'long':
+        all_drinks_formatted = [drink.long() for drink in all_drinks]
+        print(all_drinks_formatted)
     else:
-            body = request.get_json()
-            title = body.get('title', None)
-            recipe = json.loads(json.dumps(body.get('recipe', None)))
+        return abort(500, {'message': 'bad formatted function call. recipe_format needs to be "short" or "long".'})
 
-            if title is not None and title != '':
-                    drink.title = title
-            if recipe is not None and recipe != '':
-                    drink.recipe = str(recipe)
-                    drink.update()
-                    drinks = []
-                    drinks.append(drink.long())
+    if len(all_drinks_formatted) == 0:
+        abort(404, {'message': 'no drinks found in database.'})
+    
+    # Return formatted list of drinks
+    return all_drinks_formatted
 
-            return jsonify({
-                    'success': True,
-                    'drinks': drinks
-                    })
+#----------------------------------------------------------------------------#
+# Endpoints
+#----------------------------------------------------------------------------#
+
+# TODO DONE implement endpoint GET /drinks
+
+@app.route('/drinks' , methods=['GET'])
+def drinks():
+    drinks = Drink.query.all()
+    drinks_formatted = [drinks.short() for drinks in drinks]
+
+    return jsonify({
+    'success': True,
+    'drinks': drinks_formatted
+    })
+
+    # """Returns all drinks"""
+    # return jsonify({
+    # 'success': True,
+    # 'drinks': get_all_drinks('short')
+    # })
 
 
+# TODO DONE implement endpoint /drinks-detail
+
+@app.route('/drinks-detail',  methods=['GET'])
+@requires_auth('get:drinks-detail')
+def drinks_detail(payload):
+    drinks = Drink.query.all()
+    drinks_formatted = [drinks.long() for drinks in drinks]
+
+    return jsonify({
+    'success': True,
+    'drinks': drinks_formatted
+    })
+    # """Returns all drinks with detailed recipe information"""
+    # return jsonify({
+    # 'success': True,
+    # 'drinks': get_all_drinks('long')
+    # })
+
+# TODO DONE implement endpoint POST /drinks 
+@app.route('/drinks',  methods=['POST'])
+@requires_auth('post:drinks')
+def create_drink(payload):
+    body = request.get_json()
+    title = body.get('title', None)
+    recipe = str(json.dumps(body.get('recipe', None)))
+    
+    new_drink = Drink(title=title, recipe=recipe)
+    new_drink.insert()
+    drinks = []
+    drinks.append(new_drink.long())
+
+    return jsonify({
+        'success': True,
+        'drinks': drinks
+        })
+
+
+# TODO DONE implement endpoint PATCH /drinks/<id>
+    
+@app.route('/drinks/<int:drink_id>',  methods=['PATCH'])
+@requires_auth('patch:drinks')
+def update_drink(payload, drink_id):
+    """Updates existing drink and returns it to client"""
+    
+    # Get body from request
+    body = request.get_json()
+
+    if not body:
+      abort(400, {'message': 'request does not contain a valid JSON body.'})
+    
+    # Find drink which should be updated by id
+    drink_to_update = Drink.query.filter(Drink.id == drink_id).one_or_none()
+
+    # Check if and which fields should be updated
+    updated_title = body.get('title', None)
+    updated_recipe = body.get('recipe', None)
+    
+    # Depending on which fields are available, make apropiate updates
+    if updated_title:
+        drink_to_update.title = body['title']
+    
+    if updated_recipe:
+        drink_to_update.recipe = """{}""".format(body['recipe'])
+    
+    drink_to_update.update()
+
+    return jsonify({
+    'success': True,
+    'drinks': [Drink.long(drink_to_update)]
+    })
+
+# TODO DONE implement endpoint DELETE /drinks/<id>
 @app.route('/drinks/<int:id>', methods=['DELETE'])
 @requires_auth('delete:drinks')
 def delete_drinks(payload, id):

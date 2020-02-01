@@ -120,14 +120,15 @@ def requires_auth(permission=''):
     def requires_auth_decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
+            token = get_token_auth_header()
             try:
-                token = get_token_auth_header()
                 payload = verify_decode_jwt(token)
-                check_permissions(permission, payload)
-                return f(payload, *args, **kwargs)
-            except AuthError as e:
-                print(e.error)
-                abort(e.status_code)
-
+            except:
+                raise AuthError({
+                    'code': 'unauthorized',
+                    'description': 'Permissions not found'
+                }, 401)
+            check_permissions(permission, payload)
+            return f(payload, *args, **kwargs)
         return wrapper
     return requires_auth_decorator

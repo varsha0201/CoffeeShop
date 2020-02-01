@@ -9,15 +9,13 @@ database_path = "sqlite:///{}".format(os.path.join(project_dir, database_filenam
 
 db = SQLAlchemy()
 
-'''
-setup_db(app)
-    binds a flask application and a SQLAlchemy service
-'''
 def setup_db(app):
+    '''binds a flask application and a SQLAlchemy service'''
     app.config["SQLALCHEMY_DATABASE_URI"] = database_path
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.app = app
     db.init_app(app)
+
 
 '''
 db_drop_and_create_all()
@@ -46,18 +44,9 @@ class Drink(db.Model):
     short()
         short form representation of the Drink model
     '''
-    # def short(self):
-    #     recipe = json.loads(self.recipe)
-    #     short_recipe = {'color': recipe.get("color"), 'parts': recipe.get("parts")}
-    #     #  for r in json.loads(self.recipe)]
-    #     return {
-    #         'id': self.id,
-    #         'title': self.title,
-    #         'recipe': short_recipe
-    #     }
     def short(self):
-        print(json.loads(self.recipe))
-        short_recipe = [{'color': r['color'], 'parts': r['parts']} for r in json.loads(self.recipe)]
+        print(self.recipe)
+        short_recipe = [{"name":r["name"], "color":r["color"], "parts":r["parts"]} for r in json.loads(self.recipe) ]
         return {
             'id': self.id,
             'title': self.title,
@@ -69,12 +58,18 @@ class Drink(db.Model):
         long form representation of the Drink model
     '''
     def long(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'recipe': json.loads(self.recipe)
-        }
-
+        try:
+            return {
+                'id': self.id,
+                'title': self.title,
+                'recipe': json.loads(self.recipe)
+            }
+        except:
+            return {
+                'id': self.id,
+                'title': self.title,
+                'recipe': self.recipe
+            }
     '''
     insert()
         inserts a new model into a database
