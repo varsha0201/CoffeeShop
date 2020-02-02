@@ -1,9 +1,6 @@
-import os
-from flask import Flask, request, jsonify, abort
-from sqlalchemy import exc
 import json
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS
-
 from .database.models import db_drop_and_create_all, setup_db, Drink
 from .auth.auth import AuthError, requires_auth
 
@@ -24,11 +21,11 @@ def get_all_drinks(recipe_format):
         all_drinks_formatted = [drink.long() for drink in all_drinks]
         print(all_drinks_formatted)
     else:
-        return abort(500, {'message': 'bad formatted function call. recipe_format needs to be "short" or "long".'})
+        return abort(500, {'message': 'bad formatted function call.\
+        recipe_format needs to be "short" or "long".'})
 
     if len(all_drinks_formatted) == 0:
         abort(404, {'message': 'no drinks found in database.'})
-    
     # Return formatted list of drinks
     return all_drinks_formatted
 
@@ -37,55 +34,38 @@ def get_all_drinks(recipe_format):
 #----------------------------------------------------------------------------#
 
 # TODO DONE implement endpoint GET /drinks
-
-@app.route('/drinks' , methods=['GET'])
+@app.route('/drinks', methods=['GET'])
 def drinks():
     drinks = Drink.query.all()
     drinks_formatted = [drinks.short() for drinks in drinks]
-
     return jsonify({
-    'success': True,
-    'drinks': drinks_formatted
-    })
-
-    # """Returns all drinks"""
-    # return jsonify({
-    # 'success': True,
-    # 'drinks': get_all_drinks('short')
-    # })
-
+        'success': True,
+        'drinks': drinks_formatted
+        })
 
 # TODO DONE implement endpoint /drinks-detail
-
-@app.route('/drinks-detail',  methods=['GET'])
+@app.route('/drinks-detail', methods=['GET'])
 @requires_auth('get:drinks-detail')
 def drinks_detail(payload):
     drinks = Drink.query.all()
     drinks_formatted = [drinks.long() for drinks in drinks]
 
     return jsonify({
-    'success': True,
-    'drinks': drinks_formatted
-    })
-    # """Returns all drinks with detailed recipe information"""
-    # return jsonify({
-    # 'success': True,
-    # 'drinks': get_all_drinks('long')
-    # })
+        'success': True,
+        'drinks': drinks_formatted
+        })
 
-# TODO DONE implement endpoint POST /drinks 
-@app.route('/drinks',  methods=['POST'])
+# TODO-DONE implement endpoint POST /drinks
+@app.route('/drinks', methods=['POST'])
 @requires_auth('post:drinks')
 def create_drink(payload):
     body = request.get_json()
     title = body.get('title', None)
     recipe = str(json.dumps(body.get('recipe', None)))
-    
     new_drink = Drink(title=title, recipe=recipe)
     new_drink.insert()
     drinks = []
     drinks.append(new_drink.long())
-
     return jsonify({
         'success': True,
         'drinks': drinks
@@ -93,44 +73,35 @@ def create_drink(payload):
 
 
 # TODO DONE implement endpoint PATCH /drinks/<id>
-    
-@app.route('/drinks/<int:drink_id>',  methods=['PATCH'])
+@app.route('/drinks/<int:drink_id>', methods=['PATCH'])
 @requires_auth('patch:drinks')
 def update_drink(payload, drink_id):
     """Updates existing drink and returns it to client"""
-    
     # Get body from request
     body = request.get_json()
-
     if not body:
-      abort(400, {'message': 'request does not contain a valid JSON body.'})
-    
+        abort(400, {'message': 'request does not contain a valid JSON body.'})
     # Find drink which should be updated by id
     drink_to_update = Drink.query.filter(Drink.id == drink_id).one_or_none()
-
     # Check if and which fields should be updated
     updated_title = body.get('title', None)
     updated_recipe = body.get('recipe', None)
-    
     # Depending on which fields are available, make apropiate updates
     if updated_title:
         drink_to_update.title = body['title']
-    
     if updated_recipe:
         drink_to_update.recipe = """{}""".format(body['recipe'])
-    
     drink_to_update.update()
-
     return jsonify({
-    'success': True,
-    'drinks': [Drink.long(drink_to_update)]
-    })
+        'success': True,
+        'drinks': [Drink.long(drink_to_update)]
+        })
 
-# TODO DONE implement endpoint DELETE /drinks/<id>
-@app.route('/drinks/<int:id>', methods=['DELETE'])
+# TODO DONE implement endpoint DELETE /drinks/<drink_id>
+@app.route('/drinks/<int:drink_id>', methods=['DELETE'])
 @requires_auth('delete:drinks')
-def delete_drinks(payload, id):
-    drink = Drink.query.get(id)
+def delete_drinks(payload, drink_id):
+    drink = Drink.query.get(drink_id)
 
     if drink is None:
         abort(404)
@@ -139,7 +110,7 @@ def delete_drinks(payload, id):
 
         return jsonify({
             'success': True,
-            'delete': id
+            'delete': drink_id
             })
 
 ## Error Handling
@@ -149,10 +120,10 @@ Example error handling for unprocessable entity
 @app.errorhandler(422)
 def unprocessable(error):
     return jsonify({
-                    "success": False, 
-                    "error": 422,
-                    "message": "unprocessable"
-                    }), 422
+        "success": False,
+        "error": 422,
+        "message": "unprocessable"
+        }), 422
 
 @app.errorhandler(404)
 def resource_not_found(error):
@@ -169,6 +140,14 @@ def bad_request(error):
         "error": 400,
         "message": "resource not found"
         }), 400
+
+@app.errorhandler(401)
+def custom_401(error):
+    return jsonify({
+        "success": False,
+        "error": 401,
+        "message": "unauthorized user, please login and try again."
+        }), 401
 
 @app.errorhandler(AuthError)
 def handle_auth_error(error):
